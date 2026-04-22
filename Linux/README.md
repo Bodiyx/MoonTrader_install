@@ -1,91 +1,124 @@
-> [!WARNING]
-> ## ⚠️ Репозиторий более не поддерживается
->
-> Репозиторий переведён в архивный режим и **больше не развивается и не поддерживается автором**.
->
-> - Код остаётся доступен «as is» для ознакомления и использования на свой страх и риск.
-> - Работоспособность с актуальными версиями зависимостей и внешних сервисов **не гарантируется**.
-> - Репозиторий можно свободно форкать — если вы хотите продолжить разработку, создавайте форк и развивайте его у себя.
+# Установка MoonTrader для Linux
 
----
-
-
-# 🚀 Скрипт установки торгового терминала MoonTrader
-
-Автоматический установщик торгового терминала MoonTrader для Linux систем с поддержкой мониторинга MTGuardian.
+Автоматический установщик MoonTrader для Linux с поддержкой:
+- установки MoonTrader
+- MTGuardian
+- ежедневного бэкапа активного профиля
 
 > **English version**: [README_EN.md](README_EN.md)
 
-## 📋 Содержание
+## Поддерживаемые системы
 
-- [Системные требования](#-системные-требования)
-- [Поддерживаемые системы](#-поддерживаемые-системы)
-- [Быстрая установка](#-быстрая-установка)
-- [Варианты установки](#-варианты-установки)
-- [Управление MoonTrader](#-управление-moontrader)
-- [MTGuardian - Мониторинг](#-mtguardian---мониторинг)
-- [Структура файлов](#-структура-файлов)
-- [Устранение неполадок](#-устранение-неполадок)
+- Ubuntu 20.04+
+- Ubuntu 22.04+
+- Ubuntu 24.04+
+- Debian 12+
+- Архитектуры: `AMD64`, `ARM64`
 
-## ⚙️ Системные требования
+## Быстрая установка
 
-- **ОС**: Ubuntu 20.04+, Debian 12+
-- **Архитектура**: AMD64 (x86_64), ARM64 (aarch64)
-- **Права**: root доступ
-- **MoonTrader требования**: см. [официальный сайт](https://moontrader.com)
-
-## 🖥️ Поддерживаемые системы
-
-| Система | Версия | Статус |
-|---------|--------|--------|
-| Ubuntu | 20.04 LTS | ⚠️ Устаревшая операционная система |
-| Ubuntu | 22.04 LTS | ✅ Протестировано |
-| Ubuntu | 24.04 LTS | ✅ Протестировано |
-| Debian | 12 | ⚠️ Протестировано, но не полностью |
-
-
-## 🚀 Быстрая установка
-
-### 1. Подключиться по SSH
-Используйте SSH-клиент для подключения к серверу (выбор клиента на ваше усмотрение):
-- **Windows**: например, [MobaXterm](https://mobaxterm.mobatek.net/), [mRemoteNG](https://mremoteng.org/) (ссылки приведены для примера и могут быть неактуальны)
-- **Linux/Mac**: встроенный SSH-клиент в терминале
+### 1. Подключитесь к серверу
 
 ```bash
 ssh user@your-server-ip
 ```
 
-### 2. Повысить права до Root
+### 2. Получите root-права
+
 ```bash
-# Для Ubuntu
+# Ubuntu
 sudo su
 
-# Для Debian
+# Debian
 su -
 ```
 
-### 3. Установка
+### 3. Запустите установщик
+
 ```bash
-wget -O - https://raw.githubusercontent.com/SlippingForest/MoonTrader_install/master/Linux/install.sh | bash <(cat) </dev/tty
+wget -O - https://raw.githubusercontent.com/Bodiyx/MoonTrader_install/master/Linux/install.sh | bash <(cat) </dev/tty
 ```
 
-## 🔧 Варианты установки
+## Варианты установки
 
-### Автоматическая установка
-- ✅ Установка MoonTrader
-- ✅ Настройка времени (chrony)
-- ✅ Настройка брандмауэра
-- ✅ Настройка Fail2Ban
-- ❌ MTGuardian (мониторинг)
+### Automatic installation
 
-### Пользовательская установка
-- ✅ Выбор источника загрузки (официальный/Dropbox)
-- ✅ Настройка времени (chrony)
-- ✅ Настройка брандмауэра
-- ✅ Настройка Fail2Ban
-- ✅ **MTGuardian (мониторинг)**
+Этот режим нужен, когда вы ставите сервер с нуля и хотите получить готовую базовую настройку.
 
-## 🎮 Управление MoonTrader
+Что включено по умолчанию:
+- установка MoonTrader
+- настройка времени `chrony`
+- настройка брандмауэра
+- настройка `Fail2Ban`
+- ежедневный бэкап активного профиля
+
+Что не включено:
+- `MT Guardian`
+
+### Custom installation
+
+Этот режим нужен, когда вы хотите сами выбрать, что именно добавить на сервер.
+
+Доступные опции:
+- `MT Link: Official`
+- `MT Link: Dropbox`
+- `Setup Time (chrony)`
+- `Setup Firewall`
+- `Setup Fail2Ban`
+- `Setup MT Guardian`
+- `Setup Profile Backup`
+
+Правила выбора источника MoonTrader:
+- включён только `Official` -> MoonTrader ставится из official source
+- включён только `Dropbox` -> MoonTrader ставится из Dropbox source
+- оба выключены -> установка MoonTrader пропускается
+- оба включены -> установщик попросит оставить только один источник
+
+## Режим только для бэкапа
+
+Это сценарий для уже работающего сервера, где MoonTrader уже установлен, а вам нужно только добавить автоматический бэкап.
+
+Что сделать:
+1. Выберите `Custom installation`
+2. Выключите `MT Link: Official`
+3. Выключите `MT Link: Dropbox`
+4. Включите `Setup Profile Backup`
+5. Оставьте остальные пункты по ситуации
+
+В этом режиме MoonTrader не переустанавливается.
+
+## Как работает бэкап профиля
+
+Для вас это означает простую схему: установщик сам определяет активный профиль, каждый день архивирует его и хранит только последние 5 архивов.
+
+Технически это устроено так:
+- активный профиль берётся из `/root/.config/moontrader-data/data/default.profile`
+- архивы складываются в `/root/.config/moontrader-data/backup`
+- запуск по расписанию создаётся через `/etc/cron.d/moontrader-profile-backup`
+- сам скрипт бэкапа ставится в `/usr/local/bin/moontrader-profile-backup.sh`
+
+### Что создаётся на сервере
+
+- backup script: `/usr/local/bin/moontrader-profile-backup.sh`
+- cron job: `/etc/cron.d/moontrader-profile-backup`
+- log file: `/var/log/moontrader-profile-backup.log`
+- backup directory: `/root/.config/moontrader-data/backup`
+
+### Ручной запуск бэкапа
+
+```bash
+/usr/local/bin/moontrader-profile-backup.sh
+```
+
+### Быстрая проверка бэкапа
+
+```bash
+ls -l /usr/local/bin/moontrader-profile-backup.sh
+cat /etc/cron.d/moontrader-profile-backup
+ls -la /root/.config/moontrader-data/backup
+```
+
+## Управление MoonTrader
 
 ### Основные команды
 
@@ -95,171 +128,80 @@ wget -O - https://raw.githubusercontent.com/SlippingForest/MoonTrader_install/ma
 | `MoonTrader --no-update` | Запуск без обновления |
 | `MoonTrader --stop` | Остановка ядра |
 | `MoonTrader --status` | Статус процессов |
-| `MoonTrader --attach` | Подключение к tmux сессии |
+| `MoonTrader --attach` | Подключение к tmux-сессии |
 | `MoonTrader --help` | Справка |
 
 ### Работа с tmux
 
-#### Запуск в tmux сессии
 ```bash
-# Запуск MoonTrader (создает сессию 'mt' автоматически)
+# Запуск MoonTrader
 MoonTrader
 
-# Отключение от сессии (Ctrl+B, затем D)
-# MoonTrader продолжит работать в фоне
-```
-
-#### Подключение к сессии
-```bash
-# Подключение к существующей сессии
-tmux attach -t mt
-
-# Или через команду MoonTrader
+# Подключение к tmux-сессии
 MoonTrader --attach
+
+# Проверка tmux-сессий
+tmux list-sessions
 ```
 
-### Остановка и очистка
+## MTGuardian
 
-#### Остановка MoonTrader
+### Установка
+
+1. Выберите `Custom installation`
+2. Включите `Setup MT Guardian`
+3. Введите параметры Telegram-бота
+
+### Управление
+
 ```bash
-# Мягкая остановка
-MoonTrader --stop
-
-# Принудительная остановка (если не реагирует)
-pkill -f MTCore
-```
-
-#### Очистка данных
-```bash
-# Очистка профиля (сброс к настройкам по умолчанию)
-rm -rf ~/.config/moontrader-data/data
-
-# Очистка логов
-rm -rf ~/.config/moontrader-data/data/logs/
-
-# Очистка архивных данных
-rm -rf ~/.config/moontrader-data/data/archive/
-```
-
-## 🛡️ MTGuardian - Мониторинг
-
-MTGuardian - система мониторинга MoonTrader с уведомлениями в Telegram.
-
-### Установка MTGuardian
-1. Выберите **Custom installation** при установке
-2. Включите опцию **Setup MT Guardian**
-3. Введите данные Telegram бота:
-   - **Server Name**: имя вашего сервера или свое название
-   - **Bot Token**: токен Telegram бота
-   - **Chat ID**: ID чата для уведомлений
-
-### Управление MTGuardian
-```bash
-# Статус службы
 systemctl status mtguardian
-
-# Запуск службы
 systemctl start mtguardian
-
-# Остановка службы
 systemctl stop mtguardian
-
-# Перезапуск службы
 systemctl restart mtguardian
-
-# Просмотр логов
 tail -f ~/MTGuardian/MTGuardian.log
 ```
 
-### Управление автозапуском MTGuardian
+## Структура файлов
 
-```bash
-# Включить автозапуск
-sudo systemctl enable mtguardian
-
-# Отключить автозапуск
-sudo systemctl disable mtguardian
-
-# Проверить статус
-sudo systemctl is-enabled mtguardian
-
-# Полная остановка (MTCore продолжит работать)
-sudo systemctl stop mtguardian && sudo systemctl disable mtguardian
-```
-
-### Настройка Telegram бота
-1. Создайте бота через [@BotFather](https://t.me/BotFather)
-2. Получите токен бота
-3. Узнайте Chat ID через [@myidbot](https://t.me/myidbot) или подобный
-
-## 📁 Структура файлов
-
-```
+```text
 ~/
-├── moontrader/                    # Ядро MoonTrader
-│   ├── MTCore                     # Исполняемый файл
-│   └── start_mt.sh                   # Скрипт запуска
-├── .config/moontrader-data/       # Конфигурация и данные
+├── moontrader/
+│   ├── MTCore
+│   └── start_mt.sh
+├── .config/moontrader-data/
+│   ├── backup/
 │   └── data/
-│       ├── default.profile       # Профиль по умолчанию
-│       ├── logs/                 # Логи
-│       └── archive/              # Архивные данные
-└── MTGuardian/                   # Система мониторинга
-    ├── MTGuardian                # Основной скрипт
-    ├── MTGuardian.settings       # Настройки
-    └── MTGuardian.log           # Логи мониторинга
+│       ├── default.profile
+│       ├── logs/
+│       └── archive/
+└── MTGuardian/
+    ├── MTGuardian
+    ├── MTGuardian.settings
+    └── MTGuardian.log
 ```
 
-### Быстрая навигация
+## Устранение неполадок
+
+### MoonTrader
+
 ```bash
-# Переход в каталог ядра
-cd ~/moontrader
-
-# Переход в каталог конфигурации
-cd ~/.config/moontrader-data/
-
-# Переход в каталог MTGuardian
-cd ~/MTGuardian
-```
-
-## 🔧 Устранение неполадок
-
-### Проблемы с запуском
-```bash
-# Проверка статуса
 MoonTrader --status
-
-# Проверка процессов
 ps aux | grep MTCore
-
-# Проверка tmux сессий
 tmux list-sessions
-
-# Подключение к сессии MoonTrader (если существует)
-tmux attach -t mt
 ```
 
-### Проблемы с MTGuardian
+### MTGuardian
+
 ```bash
-# Проверка службы
 systemctl status mtguardian
-
-# Просмотр логов
 journalctl -u mtguardian -f
-
-# Проверка конфигурации
-cat ~/MTGuardian/MTGuardian.settings
 ```
 
-### Проблемы с сетью
+### Бэкап
+
 ```bash
-# Проверка брандмауэра
-iptables -L
-
-# Проверка портов
-netstat -tulpn | grep 4242
+tail -f /var/log/moontrader-profile-backup.log
+/usr/local/bin/moontrader-profile-backup.sh
+ls -la /root/.config/moontrader-data/backup
 ```
-
----
-
-**Удачной торговли! 🚀📈**

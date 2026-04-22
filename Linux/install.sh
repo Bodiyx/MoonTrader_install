@@ -760,13 +760,31 @@ configure_fail2ban() {
 # Enhanced package update function
 function update_packages() {
     local error_output exit_code
+    local max_attempts=5
+    local attempt=1
+    local update_ok=0
 
     log execution "$(extract_tips "h_update_packages_title")..."
 
-    error_output=$(apt update 2>&1)
-    exit_code=$?
-    if [ $exit_code -ne 0 ]; then
-        log error "$(extract_tips "h_update_packages_error"): Update failed (exit code: $exit_code)\nOutput: $error_output"
+    while [ $attempt -le $max_attempts ]; do
+        # Some Ubuntu mirrors can return transient hash/size mismatches while syncing.
+        # Retry update a few times before failing the whole installation.
+        error_output=$(apt update -o Acquire::Retries=3 2>&1)
+        exit_code=$?
+        if [ $exit_code -eq 0 ]; then
+            update_ok=1
+            break
+        fi
+
+        log warning "APT update attempt $attempt/$max_attempts failed (exit code: $exit_code). Retrying..."
+        apt clean >/dev/null 2>&1
+        rm -rf /var/lib/apt/lists/partial/* >/dev/null 2>&1
+        sleep 15
+        attempt=$((attempt + 1))
+    done
+
+    if [ $update_ok -ne 1 ]; then
+        log error "$(extract_tips "h_update_packages_error"): Update failed after $max_attempts attempts (last exit code: $exit_code)\nOutput: $error_output"
         return $exit_code
     fi
 
