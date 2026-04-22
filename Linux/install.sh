@@ -110,11 +110,13 @@ declare CPU_ARCH=""
 declare DEFAULT_USER=""
 declare DEFAULT_USER_DIRECTORY=""
 declare INSTALL_OPTION=""
-declare SETUP_CUSTOM_LINK=""
+declare SETUP_MT_LINK_OFFICIAL=""
+declare SETUP_MT_LINK_DROPBOX=""
 declare SETUP_TIME=""
 declare SETUP_FIREWALL=""
 declare SETUP_FAIL2BAN=""
 declare SETUP_MT_GUARDIAN=""
+declare SETUP_PROFILE_BACKUP=""
 declare SETUP_MT_LINK=""
 
 # Function to select language
@@ -508,31 +510,38 @@ setup_install() {
 
 # Function to handle automatic installation setup
 setup_automatic() {
-    SETUP_CUSTOM_LINK=0
+    SETUP_MT_LINK_OFFICIAL=1
+    SETUP_MT_LINK_DROPBOX=0
     SETUP_TIME=1
     SETUP_FIREWALL=1
     SETUP_FAIL2BAN=1
     SETUP_MT_GUARDIAN=0
+    SETUP_PROFILE_BACKUP=1
 }
 
 # Function to handle custom installation setup with multi-select options
 setup_custom() {
-    local custom_link_choice=0
+    local mt_link_official_choice=1
+    local mt_link_dropbox_choice=0
     local time_choice=1
     local firewall_choice=1
     local fail2ban_choice=1
     local guardian_choice=0
+    local backup_choice=1
 
     while true; do
         clear
         log select "$(extract_tips "h_setup_custom_title")"
         echo
-        if [[ $custom_link_choice -eq 0 ]]; then
+        if [[ $mt_link_official_choice -eq 1 ]]; then
             echo "1) [✔] MT Link: Official"
-            echo "2) [ ] MT Link: Dropbox"
         else
             echo "1) [ ] MT Link: Official"
+        fi
+        if [[ $mt_link_dropbox_choice -eq 1 ]]; then
             echo "2) [✔] MT Link: Dropbox"
+        else
+            echo "2) [ ] MT Link: Dropbox"
         fi
         if [[ $time_choice -eq 1 ]]; then
             echo "3) [✔] Setup Time(chrony)"
@@ -554,26 +563,47 @@ setup_custom() {
         else
             echo "6) [ ] Setup MT Guardian"
         fi
+        if [[ $backup_choice -eq 1 ]]; then
+            echo "7) [✔] Setup Profile Backup"
+        else
+            echo "7) [ ] Setup Profile Backup"
+        fi
         echo
         log select "$(extract_tips "h_setup_install_tips")"
         read -n 1 input
         case $input in
-        1) custom_link_choice=$((1 - custom_link_choice)) ;;
-        2) custom_link_choice=$((1 - custom_link_choice)) ;;
+        1) mt_link_official_choice=$((1 - mt_link_official_choice)) ;;
+        2) mt_link_dropbox_choice=$((1 - mt_link_dropbox_choice)) ;;
         3) time_choice=$((1 - time_choice)) ;;
         4) firewall_choice=$((1 - firewall_choice)) ;;
         5) fail2ban_choice=$((1 - fail2ban_choice)) ;;
         6) guardian_choice=$((1 - guardian_choice)) ;;
-        "") break ;;
+        7) backup_choice=$((1 - backup_choice)) ;;
+        "")
+            if [[ $mt_link_official_choice -eq 1 && $mt_link_dropbox_choice -eq 1 ]]; then
+                echo
+                log warning "Select only one MT Link source: Official or Dropbox"
+                sleep 2
+                continue
+            fi
+            if [[ $mt_link_official_choice -eq 0 && $mt_link_dropbox_choice -eq 0 ]]; then
+                echo
+                log warning "MoonTrader installation will be skipped"
+                sleep 2
+            fi
+            break
+            ;;
         [Qq]) echo && log info "$(extract_tips "h_exit")" && exit 0 ;;
         esac
     done
 
-    SETUP_CUSTOM_LINK=$((custom_link_choice))
+    SETUP_MT_LINK_OFFICIAL=$((mt_link_official_choice))
+    SETUP_MT_LINK_DROPBOX=$((mt_link_dropbox_choice))
     SETUP_TIME=$((time_choice))
     SETUP_FIREWALL=$((firewall_choice))
     SETUP_FAIL2BAN=$((fail2ban_choice))
     SETUP_MT_GUARDIAN=$((guardian_choice))
+    SETUP_PROFILE_BACKUP=$((backup_choice))
 }
 
 # Enhanced swap enable function
@@ -1270,6 +1300,124 @@ function setup_time() {
     return 0
 }
 
+# Configure automatic daily backup for the active MoonTrader profile
+function setup_profile_backup() {
+    local backup_dir="/root/.config/moontrader-data/backup"
+    local backup_script="/usr/local/bin/moontrader-profile-backup.sh"
+    local cron_file="/etc/cron.d/moontrader-profile-backup"
+    local log_file="/var/log/moontrader-profile-backup.log"
+
+    log execution "Setting up MoonTrader profile backup"
+
+    if ! mkdir -p "$backup_dir"; then
+        log error "Failed to create backup directory: $backup_dir"
+        return 1
+    fi
+
+    if ! cat <<'EOF' >"$backup_script"; then
+#!/bin/bash
+set -u
+
+PROFILE_CONFIG="/root/.config/moontrader-data/data/default.profile"
+DATA_DIR="/root/.config/moontrader-data/data"
+BACKUP_DIR="/root/.config/moontrader-data/backup"
+BACKUP_PREFIX="moontrader_profile_backup"
+
+log_info() {
+    echo "$(date '+%Y-%m-%d %H:%M:%S') [INFO] $1"
+}
+
+log_warning() {
+    echo "$(date '+%Y-%m-%d %H:%M:%S') [WARNING] $1"
+}
+
+if [ ! -f "$PROFILE_CONFIG" ]; then
+    log_warning "Default profile config not found: $PROFILE_CONFIG"
+    exit 0
+fi
+
+PROFILE_NAME=$(awk -F: '/^default:/ {gsub(/^[[:space:]]+|[[:space:]]+$/, "", $2); print $2; exit}' "$PROFILE_CONFIG")
+if [ -z "$PROFILE_NAME" ]; then
+    log_warning "Active profile name was not found in $PROFILE_CONFIG"
+    exit 0
+fi
+
+PROFILE_DIR="$DATA_DIR/$PROFILE_NAME"
+if [ ! -d "$PROFILE_DIR" ]; then
+    log_warning "Active profile directory not found: $PROFILE_DIR"
+    exit 0
+fi
+
+if ! mkdir -p "$BACKUP_DIR"; then
+    log_warning "Failed to create backup directory: $BACKUP_DIR"
+    exit 1
+fi
+
+ARCHIVE_PATH="$BACKUP_DIR/${BACKUP_PREFIX}_${PROFILE_NAME}_$(date '+%Y%m%d_%H%M%S').tar.gz"
+if ! tar -czf "$ARCHIVE_PATH" -C "$DATA_DIR" "$PROFILE_NAME"; then
+    log_warning "Failed to create backup archive: $ARCHIVE_PATH"
+    exit 1
+fi
+
+log_info "Backup created: $ARCHIVE_PATH"
+
+mapfile -t OLD_BACKUPS < <(find "$BACKUP_DIR" -maxdepth 1 -type f -name "${BACKUP_PREFIX}_*.tar.gz" -printf '%T@ %p\n' | sort -nr | awk 'NR > 5 {print substr($0, index($0, " ") + 1)}')
+if [ "${#OLD_BACKUPS[@]}" -gt 0 ]; then
+    for backup_file in "${OLD_BACKUPS[@]}"; do
+        rm -f -- "$backup_file"
+    done
+    log_info "Removed old backups, kept the 5 newest archives"
+fi
+EOF
+        log error "Failed to write backup script: $backup_script"
+        return 1
+    fi
+
+    if ! chmod 755 "$backup_script"; then
+        log error "Failed to set executable permissions on $backup_script"
+        return 1
+    fi
+
+    if ! touch "$log_file"; then
+        log error "Failed to create backup log file: $log_file"
+        return 1
+    fi
+
+    if ! chmod 600 "$log_file"; then
+        log warning "Failed to set permissions on backup log file: $log_file"
+    fi
+
+    if ! cat <<EOF >"$cron_file"; then
+SHELL=/bin/bash
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+17 3 * * * root $backup_script >> $log_file 2>&1
+EOF
+        log error "Failed to write cron file: $cron_file"
+        return 1
+    fi
+
+    if ! chmod 644 "$cron_file"; then
+        log error "Failed to set permissions on cron file: $cron_file"
+        return 1
+    fi
+
+    if command -v systemctl >/dev/null 2>&1; then
+        if ! systemctl enable cron >/dev/null 2>&1; then
+            log warning "Failed to enable cron service automatically"
+        fi
+        if ! systemctl restart cron >/dev/null 2>&1; then
+            log warning "Failed to restart cron service automatically"
+        fi
+    elif command -v service >/dev/null 2>&1; then
+        if ! service cron restart >/dev/null 2>&1; then
+            log warning "Failed to restart cron service automatically"
+        fi
+    fi
+
+    log success "MoonTrader profile backup configured"
+    return 0
+}
+
 # Enhanced MT Guardian setup function using automatic installer
 function setup_mtguardian() {
     local error_output exit_code
@@ -1671,6 +1819,9 @@ create_mtguardian_service() {
 main() {
     # Set error handling
     set -o pipefail
+    local requires_core_setup=0
+    local reboot_required=0
+    local moontrader_directory=""
 
     # Language selection
     select_language || {
@@ -1709,53 +1860,70 @@ main() {
         setup_custom
     fi
 
+    moontrader_directory="$DEFAULT_USER_DIRECTORY/moontrader"
+
     # Get the link to download MoonTrader
-    if [[ $SETUP_CUSTOM_LINK -eq 0 ]]; then
+    if [[ $SETUP_MT_LINK_OFFICIAL -eq 1 ]]; then
         SETUP_MT_LINK=$(get_mt_link "$CPU_ARCH" "official") || {
             log error "Failed to get official MoonTrader link"
             exit 1
         }
-    else
+    elif [[ $SETUP_MT_LINK_DROPBOX -eq 1 ]]; then
         SETUP_MT_LINK=$(get_mt_link "$CPU_ARCH" "dropbox") || {
             log error "Failed to get dropbox MoonTrader link"
             exit 1
         }
+    else
+        SETUP_MT_LINK=""
+        log warning "MoonTrader installation will be skipped"
+    fi
+
+    if [[ -n "$SETUP_MT_LINK" || $SETUP_TIME -eq 1 || $SETUP_FIREWALL -eq 1 || $SETUP_FAIL2BAN -eq 1 ]]; then
+        requires_core_setup=1
     fi
 
     clear
-    log title "$(extract_tips "h_install_title")"
+    if [[ -n "$SETUP_MT_LINK" ]]; then
+        log title "$(extract_tips "h_install_title")"
+    else
+        log title "Applying selected Linux setup options"
+    fi
 
-    # System preparation with error checking
-    enable_swap || log warning "Swap setup failed, continuing..."
+    if [[ $requires_core_setup -eq 1 ]]; then
+        # System preparation with error checking
+        enable_swap || log warning "Swap setup failed, continuing..."
 
-    remove_packages || log warning "Package removal had issues, continuing..."
+        remove_packages || log warning "Package removal had issues, continuing..."
 
-    update_packages || {
-        log error "Package update failed"
-        exit 1
-    }
-
-    # Install required packages
-    local required_packages=(
-        "apt-transport-https"
-        "dmidecode"
-        "htop"
-        "mc"
-        "screen"
-        "tmux"
-        "psmisc"
-        "libncurses6"
-        "libtommath1"
-        "p7zip-full"
-        "git"
-    )
-
-    for package in "${required_packages[@]}"; do
-        install_package "$package" || {
-            log error "Failed to install required package: $package"
+        update_packages || {
+            log error "Package update failed"
             exit 1
         }
-    done
+
+        # Install required packages
+        local required_packages=(
+            "apt-transport-https"
+            "dmidecode"
+            "htop"
+            "mc"
+            "screen"
+            "tmux"
+            "psmisc"
+            "libncurses6"
+            "libtommath1"
+            "p7zip-full"
+            "git"
+        )
+
+        for package in "${required_packages[@]}"; do
+            install_package "$package" || {
+                log error "Failed to install required package: $package"
+                exit 1
+            }
+        done
+    else
+        log info "Skipping MoonTrader core setup because no installation-related options were selected"
+    fi
 
     # Optional installations with error checking
     if [[ $SETUP_TIME -eq 1 ]]; then
@@ -1767,6 +1935,7 @@ main() {
             log error "Time setup failed"
             exit 1
         }
+        reboot_required=1
     fi
 
     if [[ $SETUP_FIREWALL -eq 1 ]]; then
@@ -1778,6 +1947,7 @@ main() {
             log error "Firewall setup failed"
             exit 1
         }
+        reboot_required=1
     fi
 
     if [[ $SETUP_FAIL2BAN -eq 1 ]]; then
@@ -1785,45 +1955,97 @@ main() {
             log error "Failed to install fail2ban"
             exit 1
         }
+        reboot_required=1
+    fi
+
+    if [[ $SETUP_PROFILE_BACKUP -eq 1 ]]; then
+        install_package "cron" || {
+            log error "Failed to install cron"
+            exit 1
+        }
     fi
 
     # Install MoonTrader FIRST (MTGuardian depends on it)
-    install_mt "$DEFAULT_USER" "$DEFAULT_USER_DIRECTORY" "$SETUP_MT_LINK" || {
-        log error "MoonTrader installation failed"
-        exit 1
-    }
+    if [[ -n "$SETUP_MT_LINK" ]]; then
+        install_mt "$DEFAULT_USER" "$DEFAULT_USER_DIRECTORY" "$SETUP_MT_LINK" || {
+            log error "MoonTrader installation failed"
+            exit 1
+        }
+        reboot_required=1
+    fi
+
+    if [[ $SETUP_PROFILE_BACKUP -eq 1 ]]; then
+        setup_profile_backup || {
+            log error "Profile backup setup failed"
+            exit 1
+        }
+    fi
 
     # Install MT Guardian AFTER MoonTrader
     if [[ $SETUP_MT_GUARDIAN -eq 1 ]]; then
-        setup_mtguardian || {
-            log error "MT Guardian setup failed"
-            exit 1
-        }
+        if [[ -f "$moontrader_directory/MTCore" ]]; then
+            install_package "git" || {
+                log error "Failed to install git for MT Guardian setup"
+                exit 1
+            }
+            setup_mtguardian || {
+                log error "MT Guardian setup failed"
+                exit 1
+            }
+            reboot_required=1
+        else
+            log warning "MT Guardian setup was skipped because MoonTrader is not installed in $moontrader_directory"
+        fi
     fi
 
     # Installation complete
     log title "$(extract_tips "h_complete_install_title")"
     log info "$(extract_tips "h_complete_install_os"): $CPU_ARCH $OS_NAME"
     log info "$(extract_tips "h_complete_install_user"): $DEFAULT_USER"
-    log info "$(extract_tips "h_complete_install_dir"): $DEFAULT_USER_DIRECTORY/moontrader"
     echo
-    log hint "$(extract_tips "h_complete_install_start"): MoonTrader"
-    log hint "$(extract_tips "h_complete_install_warning")"
-    echo
-    
-    # MTGuardian information if installed
-    if [[ $SETUP_MT_GUARDIAN -eq 1 ]]; then
-        log info "MTGuardian service installed and configured:"
-        log info "  - Service will monitor MTCore automatically after first launch"
-        log info "  - Check service status: systemctl status mtguardian"
-        log info "  - View MTGuardian logs: tail -f $DEFAULT_USER_DIRECTORY/MTGuardian/MTGuardian.log"
-        log info "  - MTGuardian will send Telegram notifications on MTCore events"
+    if [[ -f "$moontrader_directory/MTCore" ]]; then
+        log info "$(extract_tips "h_complete_install_dir"): $moontrader_directory"
+        echo
+        log hint "$(extract_tips "h_complete_install_start"): MoonTrader"
+        log hint "$(extract_tips "h_complete_install_warning")"
+        echo
+    else
+        log info "MoonTrader installation was skipped"
+        echo
+    fi
+
+    if [[ $SETUP_PROFILE_BACKUP -eq 1 ]]; then
+        log info "Profile backup enabled: /root/.config/moontrader-data/backup"
+        log info "Manual backup run: /usr/local/bin/moontrader-profile-backup.sh"
+        log info "Backup log: /var/log/moontrader-profile-backup.log"
+        echo
+    else
+        log info "Profile backup was not enabled"
         echo
     fi
     
-    log warning "$(extract_tips "h_complete_install_reboot")"
-    read -n 1
-    reboot
+    # MTGuardian information if installed
+    if [[ $SETUP_MT_GUARDIAN -eq 1 ]]; then
+        if [[ -f "$moontrader_directory/MTCore" ]]; then
+            log info "MTGuardian service installed and configured:"
+            log info "  - Service will monitor MTCore automatically after first launch"
+            log info "  - Check service status: systemctl status mtguardian"
+            log info "  - View MTGuardian logs: tail -f $DEFAULT_USER_DIRECTORY/MTGuardian/MTGuardian.log"
+            log info "  - MTGuardian will send Telegram notifications on MTCore events"
+            echo
+        else
+            log info "MTGuardian was not installed because MoonTrader is missing"
+            echo
+        fi
+    fi
+
+    if [[ $reboot_required -eq 1 ]]; then
+        log warning "$(extract_tips "h_complete_install_reboot")"
+        read -n 1
+        reboot
+    else
+        log info "No reboot is required for the selected setup."
+    fi
 }
 
 # Execute main function
