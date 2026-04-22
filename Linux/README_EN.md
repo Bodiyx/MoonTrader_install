@@ -1,252 +1,207 @@
-# 🚀 MoonTrader Trading Terminal Installation Script
+# MoonTrader Installation for Linux
 
-Automatic installer for MoonTrader trading terminal for Linux systems with MTGuardian monitoring support.
+Automatic MoonTrader installer for Linux with support for:
+- MoonTrader installation
+- MTGuardian
+- daily active-profile backup
 
-> **Русская версия**: [README.md](README.md)
+> **Russian version**: [README.md](README.md)
 
-## 📋 Table of Contents
+## Supported systems
 
-- [System Requirements](#-system-requirements)
-- [Supported Systems](#-supported-systems)
-- [Quick Installation](#-quick-installation)
-- [Installation Options](#-installation-options)
-- [MoonTrader Management](#-moontrader-management)
-- [MTGuardian - Monitoring](#-mtguardian---monitoring)
-- [File Structure](#-file-structure)
-- [Troubleshooting](#-troubleshooting)
+- Ubuntu 20.04+
+- Ubuntu 22.04+
+- Ubuntu 24.04+
+- Debian 12+
+- Architectures: `AMD64`, `ARM64`
 
-## ⚙️ System Requirements
+## Quick start
 
-- **OS**: Ubuntu 20.04+, Debian 12+
-- **Architecture**: AMD64 (x86_64), ARM64 (aarch64)
-- **Privileges**: root access
-- **MoonTrader requirements**: see [official website](https://moontrader.com)
-
-## 🖥️ Supported Systems
-
-| System | Version | Status |
-|---------|--------|--------|
-| Ubuntu | 20.04 LTS | ⚠️ Outdated operating system |
-| Ubuntu | 22.04 LTS | ✅ Tested |
-| Ubuntu | 24.04 LTS | ✅ Tested |
-| Debian | 12 | ⚠️ Tested, but not fully |
-
-## 🚀 Quick Installation
-
-### 1. Connect via SSH
-Use an SSH client of your choice to connect to your server:
-- **Windows**: for example, [MobaXterm](https://mobaxterm.mobatek.net/), [mRemoteNG](https://mremoteng.org/) (links provided as examples and may be outdated)
-- **Linux/Mac**: built-in SSH client in terminal
+### 1. Connect to the server
 
 ```bash
 ssh user@your-server-ip
 ```
 
-### 2. Elevate to Root
+### 2. Switch to root
+
 ```bash
-# For Ubuntu
+# Ubuntu
 sudo su
 
-# For Debian
+# Debian
 su -
 ```
 
-### 3. Installation
+### 3. Run the installer
+
 ```bash
-wget -O - https://raw.githubusercontent.com/SlippingForest/MoonTrader_install/master/Linux/install.sh | bash <(cat) </dev/tty
+wget -O - https://raw.githubusercontent.com/Bodiyx/MoonTrader_install/master/Linux/install.sh | bash <(cat) </dev/tty
 ```
 
-## 🔧 Installation Options
+## Installation modes
 
-### Automatic Installation
-- ✅ MoonTrader installation
-- ✅ Time setup (chrony)
-- ✅ Firewall configuration
-- ✅ Fail2Ban setup
-- ❌ MTGuardian (monitoring)
+### Automatic installation
 
-### Custom Installation
-- ✅ Choose download source (official/Dropbox)
-- ✅ Time setup (chrony)
-- ✅ Firewall configuration
-- ✅ Fail2Ban setup
-- ✅ **MTGuardian (monitoring)**
+Use this when you want a ready-to-use Linux setup from scratch.
 
-## 🎮 MoonTrader Management
+Enabled by default:
+- MoonTrader installation
+- `chrony` time sync
+- firewall setup
+- `Fail2Ban`
+- daily active-profile backup
 
-### Basic Commands
+Not enabled by default:
+- `MT Guardian`
+
+### Custom installation
+
+Use this when you want to choose each component manually.
+
+Available options:
+- `MT Link: Official`
+- `MT Link: Dropbox`
+- `Setup Time (chrony)`
+- `Setup Firewall`
+- `Setup Fail2Ban`
+- `Setup MT Guardian`
+- `Setup Profile Backup`
+
+MoonTrader source selection rules:
+- only `Official` enabled -> install from official source
+- only `Dropbox` enabled -> install from Dropbox source
+- both disabled -> skip MoonTrader installation
+- both enabled -> installer asks you to keep only one source
+
+## Backup-only mode
+
+This mode is for an existing server where MoonTrader is already installed and you only want to add automatic profile backup.
+
+Steps:
+1. Choose `Custom installation`
+2. Disable `MT Link: Official`
+3. Disable `MT Link: Dropbox`
+4. Enable `Setup Profile Backup`
+5. Keep other options only if you need them
+
+MoonTrader will not be reinstalled in this mode.
+
+## How profile backup works
+
+For you as the server owner, this means the installer automatically finds the active profile, archives it every day, and keeps only the latest 5 backups.
+
+Technical details:
+- active profile is read from `/root/.config/moontrader-data/data/default.profile`
+- archives are stored in `/root/.config/moontrader-data/backup`
+- daily schedule is created in `/etc/cron.d/moontrader-profile-backup`
+- backup script is installed to `/usr/local/bin/moontrader-profile-backup.sh`
+
+### Files created on the server
+
+- backup script: `/usr/local/bin/moontrader-profile-backup.sh`
+- cron job: `/etc/cron.d/moontrader-profile-backup`
+- log file: `/var/log/moontrader-profile-backup.log`
+- backup directory: `/root/.config/moontrader-data/backup`
+
+### Manual backup run
+
+```bash
+/usr/local/bin/moontrader-profile-backup.sh
+```
+
+### Quick backup check
+
+```bash
+ls -l /usr/local/bin/moontrader-profile-backup.sh
+cat /etc/cron.d/moontrader-profile-backup
+ls -la /root/.config/moontrader-data/backup
+```
+
+## MoonTrader management
+
+### Main commands
 
 | Command | Description |
-|---------|----------|
+|---------|-------------|
 | `MoonTrader` | Start with update |
 | `MoonTrader --no-update` | Start without update |
-| `MoonTrader --stop` | Stop all processes |
-| `MoonTrader --status` | Process status |
-| `MoonTrader --attach` | Connect to tmux session |
-| `MoonTrader --help` | Help |
+| `MoonTrader --stop` | Stop the core |
+| `MoonTrader --status` | Show process status |
+| `MoonTrader --attach` | Attach to tmux session |
+| `MoonTrader --help` | Show help |
 
-### Working with tmux
+### tmux usage
 
-#### Starting in tmux session
 ```bash
-# Start MoonTrader (creates 'mt' session automatically)
+# Start MoonTrader
 MoonTrader
 
-# Detach from session (Ctrl+B, then D)
-# MoonTrader will continue running in background
-```
-
-#### Connecting to session
-```bash
-# Connect to existing session
-tmux attach -t mt
-
-# Or through MoonTrader command
+# Attach to the tmux session
 MoonTrader --attach
+
+# List tmux sessions
+tmux list-sessions
 ```
 
-### Stop and Cleanup
+## MTGuardian
 
-#### Stopping MoonTrader
+### Installation
+
+1. Choose `Custom installation`
+2. Enable `Setup MT Guardian`
+3. Enter Telegram bot settings
+
+### Management
+
 ```bash
-# Graceful stop
-MoonTrader --stop
-
-# Force stop (if not responding)
-pkill -f MTCore
-```
-
-#### Data Cleanup
-```bash
-# Profile cleanup (reset to default settings)
-rm -rf ~/.config/moontrader-data/data
-
-# Log cleanup
-rm -rf ~/.config/moontrader-data/data/logs/
-
-# Archive data cleanup
-rm -rf ~/.config/moontrader-data/data/archive/
-```
-
-## 🛡️ MTGuardian - Monitoring
-
-MTGuardian - MoonTrader monitoring system with Telegram notifications.
-
-### MTGuardian Installation
-1. Choose **Custom installation** during setup
-2. Enable **Setup MT Guardian** option
-3. Enter Telegram bot data:
-   - **Server Name**: your server name or custom name
-   - **Bot Token**: Telegram bot token
-   - **Chat ID**: notification chat ID
-
-### MTGuardian Management
-```bash
-# Service status
 systemctl status mtguardian
-
-# Start service
 systemctl start mtguardian
-
-# Stop service
 systemctl stop mtguardian
-
-# Restart service
 systemctl restart mtguardian
-
-# View logs
 tail -f ~/MTGuardian/MTGuardian.log
 ```
 
-### MTGuardian Autostart Management
+## File structure
 
-```bash
-# Enable autostart
-sudo systemctl enable mtguardian
-
-# Disable autostart
-sudo systemctl disable mtguardian
-
-# Check status
-sudo systemctl is-enabled mtguardian
-
-# Complete stop (MTCore continues running)
-sudo systemctl stop mtguardian && sudo systemctl disable mtguardian
-```
-
-### Telegram Bot Setup
-1. Create bot via [@BotFather](https://t.me/BotFather)
-2. Get bot token
-3. Get Chat ID via [@userinfobot](https://t.me/userinfobot)
-
-## 📁 File Structure
-
-```
+```text
 ~/
-├── moontrader/                    # MoonTrader core
-│   ├── MTCore                     # Executable file
-│   └── start_mt.sh                   # Startup script
-├── .config/moontrader-data/       # Configuration and data
+├── moontrader/
+│   ├── MTCore
+│   └── start_mt.sh
+├── .config/moontrader-data/
+│   ├── backup/
 │   └── data/
-│       ├── default.profile       # Default profile
-│       ├── logs/                 # Logs
-│       └── archive/              # Archive data
-└── MTGuardian/                   # Monitoring system
-    ├── MTGuardian                # Main script
-    ├── MTGuardian.settings       # Settings
-    └── MTGuardian.log           # Monitoring logs
+│       ├── default.profile
+│       ├── logs/
+│       └── archive/
+└── MTGuardian/
+    ├── MTGuardian
+    ├── MTGuardian.settings
+    └── MTGuardian.log
 ```
 
-### Quick Navigation
+## Troubleshooting
+
+### MoonTrader
+
 ```bash
-# Navigate to core directory
-cd ~/moontrader
-
-# Navigate to configuration directory
-cd ~/.config/moontrader-data/
-
-# Navigate to MTGuardian directory
-cd ~/MTGuardian
-```
-
-## 🔧 Troubleshooting
-
-### Launch Issues
-```bash
-# Check status
 MoonTrader --status
-
-# Check processes
 ps aux | grep MTCore
-
-# Check tmux sessions
 tmux list-sessions
-
-# Connect to MoonTrader session (if exists)
-tmux attach -t mt
 ```
 
-### MTGuardian Issues
+### MTGuardian
+
 ```bash
-# Check service
 systemctl status mtguardian
-
-# View logs
 journalctl -u mtguardian -f
-
-# Check configuration
-cat ~/MTGuardian/MTGuardian.settings
 ```
 
-### Network Issues
+### Backup
+
 ```bash
-# Check firewall
-iptables -L
-
-# Check ports
-netstat -tulpn | grep 4242
+tail -f /var/log/moontrader-profile-backup.log
+/usr/local/bin/moontrader-profile-backup.sh
+ls -la /root/.config/moontrader-data/backup
 ```
-
----
-
-**Happy Trading! 🚀📈**
